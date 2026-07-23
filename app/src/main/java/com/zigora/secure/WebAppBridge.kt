@@ -2,16 +2,15 @@ package com.zigora.secure
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import android.content.IntentFilter
+import android.net.wifi.WifiManager
+import android.os.BatteryManager
 import android.os.Build
-import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Toast
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.DataOutputStream
-import java.io.InputStreamReader
+import java.util.concurrent.ConcurrentHashMap
 
 class WebAppBridge(
     private val context: Context,
@@ -19,44 +18,45 @@ class WebAppBridge(
     private val performanceManager: PerformanceManager,
     private val gameOptimizer: GameOptimizer
 ) {
+    // Simpan hasil shell di map — hindari escaping issues di evaluateJavascript
+    private val shResults = ConcurrentHashMap<String, String>()
+
     init {
         webView.addJavascriptInterface(this, "ZigoraSecure")
     }
 
-    // ── Core shell bridge (async — tidak freeze UI) ──────────────
+    // ── Shell bridge ─────────────────────────────────────────────
+    // JS ambil hasil via getShResult() — tidak ada string escaping masalah
     @JavascriptInterface
     fun executeShellAsync(command: String, callbackId: String) {
         Thread {
             val result = runShell(command)
-            // Escape untuk JS string
-            val escaped = result
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "")
-                .replace("\t", "\\t")
+            shResults[callbackId] = result
             webView.post {
                 webView.evaluateJavascript(
-                    "if(window._shCb)window._shCb('$callbackId',\"$escaped\")", null
+                    "if(window._shCb)window._shCb('$callbackId')", null
                 )
             }
         }.start()
     }
 
-    // Sync versi untuk backward compat (hanya untuk perintah cepat)
+    // JS panggil ini untuk ambil hasil setelah callback
+    @JavascriptInterface
+    fun getShResult(callbackId: String): String {
+        return shResults.remove(callbackId) ?: ""
+    }
+
     @JavascriptInterface
     fun executeShell(command: String): String = runShell(command)
 
-    // ── Rooted shell runner ──────────────────────────────────────
     private fun runShell(command: String): String {
         return try {
             val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
-            val stdout = proc.inputStream.bufferedReader().readText()
+            val out = proc.inputStream.bufferedReader().readText()
             proc.waitFor()
-            stdout
+            out
         } catch (e: Exception) {
             try {
-                // Fallback tanpa su (untuk perintah non-root)
                 val proc = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
                 val out = proc.inputStream.bufferedReader().readText()
                 proc.waitFor()
@@ -65,74 +65,118 @@ class WebAppBridge(
         }
     }
 
-    // ── Game Library ─────────────────────────────────────────────
+    // ── Battery ───────────────────────────────────────────────────
+    @JavascriptInterface
+    fun getBatteryInfo(): String {
+        return try {
+            val intent = context.registerReceiver(null,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+            val pct = if (level >= 0 && scale > 0) (level * 100 / scale) else -1
+            val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                           status == BatteryManager.BATTERY_STATUS_FULL
+            val temp = (intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0) / 10.0
+            val voltage = (intent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) ?: 0)
+            JSONObject(mapOf(
+                "level" to pct,
+                "charging" to charging,
+                "temp" to temp,
+                "voltage" to voltage
+            )).toString()
+        } catch (e: Exception) { "{\"level\":-1}" }
+    }
+
+    // ── RAM ───────────────────────────────────────────────────────
+    @JavascriptInterface
+    fun getMemoryInfo(): String {
+        return try {
+            val mi = android.app.ActivityManager.MemoryInfo()
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            am.getMemoryInfo(mi)
+            JSONObject(mapOf(
+                "total" to mi.totalMem,
+                "avail" to mi.availMem,
+                "low" to mi.lowMemory,
+                "threshold" to mi.threshold
+            )).toString()
+        } catch (e: Exception) { "{}" }
+    }
+
+    // ── Network ───────────────────────────────────────────────────
+    @JavascriptInterface
+    fun getWifiInfo(): String {
+        return try {
+            val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val info = wm.connectionInfo
+            JSONObject(mapOf(
+                "ssid" to (info.ssid?.replace("\"","") ?: ""),
+                "rssi" to info.rssi,
+                "linkSpeed" to info.linkSpeed,
+                "ip" to android.text.format.Formatter.formatIpAddress(info.ipAddress)
+            )).toString()
+        } catch (e: Exception) { "{}" }
+    }
+
+    // ── Installed packages ────────────────────────────────────────
     @JavascriptInterface
     fun getInstalledPackages(): String {
         return try {
-            val pm = context.packageManager
-            val pkgs = pm.getInstalledApplications(0)
-            pkgs.joinToString("\n") { it.packageName }
+            context.packageManager
+                .getInstalledApplications(0)
+                .joinToString("\n") { it.packageName }
         } catch (e: Exception) { "" }
     }
 
     @JavascriptInterface
-    fun launchApp(packageName: String): Boolean {
-        return try {
-            val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-            if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-                true
-            } else false
-        } catch (e: Exception) { false }
+    fun isAppInstalled(pkg: String): Boolean {
+        return try { context.packageManager.getPackageInfo(pkg, 0); true }
+        catch (e: Exception) { false }
     }
 
+    // ── Launch ────────────────────────────────────────────────────
     @JavascriptInterface
-    fun isAppInstalled(packageName: String): Boolean {
+    fun launchApp(pkg: String): Boolean {
         return try {
-            context.packageManager.getPackageInfo(packageName, 0)
+            val intent = context.packageManager.getLaunchIntentForPackage(pkg)
+                ?: return false
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
             true
         } catch (e: Exception) { false }
     }
 
+    @JavascriptInterface
+    fun launchGame(pkg: String): Boolean = launchApp(pkg).also {
+        if (it) gameOptimizer.optimizeForGame(pkg)
+    }
+
     // ── Performance ───────────────────────────────────────────────
     @JavascriptInterface
-    fun enablePerformanceMode(): Boolean = performanceManager.enablePerformanceMode()
-
+    fun enablePerformanceMode() = performanceManager.enablePerformanceMode()
     @JavascriptInterface
-    fun disablePerformanceMode(): Boolean = performanceManager.disablePerformanceMode()
-
+    fun disablePerformanceMode() = performanceManager.disablePerformanceMode()
     @JavascriptInterface
-    fun enableGamingMode(): Boolean = performanceManager.enableGamingMode()
-
+    fun enableGamingMode() = performanceManager.enableGamingMode()
     @JavascriptInterface
-    fun disableGamingMode(): Boolean = performanceManager.disableGamingMode()
-
+    fun disableGamingMode() = performanceManager.disableGamingMode()
     @JavascriptInterface
-    fun freeMemory(): Boolean = performanceManager.enablePerformanceMode()
-
-    // ── Game Optimizer ────────────────────────────────────────────
+    fun freeMemory() = performanceManager.enablePerformanceMode()
     @JavascriptInterface
-    fun unlockFps(): Boolean = gameOptimizer.unlockFps()
-
+    fun unlockFps() = gameOptimizer.unlockFps()
     @JavascriptInterface
-    fun lockFps(fps: Int): Boolean = gameOptimizer.lockFps(fps)
-
+    fun lockFps(fps: Int) = gameOptimizer.lockFps(fps)
     @JavascriptInterface
-    fun optimizeGame(gamePackage: String): Boolean = gameOptimizer.optimizeForGame(gamePackage)
+    fun optimizeGame(pkg: String) = gameOptimizer.optimizeForGame(pkg)
 
+    // ── System info ───────────────────────────────────────────────
     @JavascriptInterface
-    fun launchGame(gamePackage: String): Boolean = gameOptimizer.launchGame(gamePackage)
-
-    // ── System Info ───────────────────────────────────────────────
+    fun getSystemInfo() = JSONObject(performanceManager.getSystemInfo()).toString()
     @JavascriptInterface
-    fun getSystemInfo(): String = JSONObject(performanceManager.getSystemInfo()).toString()
-
+    fun getGameStatus() = JSONObject(gameOptimizer.getGameOptimizationStatus()).toString()
     @JavascriptInterface
-    fun getGameStatus(): String = JSONObject(gameOptimizer.getGameOptimizationStatus()).toString()
-
-    @JavascriptInterface
-    fun getPerformanceStatus(): String = JSONObject(mapOf(
+    fun getPerformanceStatus() = JSONObject(mapOf(
         "performance_mode" to performanceManager.isPerformanceModeEnabled(),
         "gaming_mode" to performanceManager.isGamingModeEnabled(),
         "game_mode" to gameOptimizer.isGameModeActive()
@@ -148,21 +192,11 @@ class WebAppBridge(
         } catch (e: Exception) { false }
     }
 
-    // ── UI Helpers ────────────────────────────────────────────────
+    // ── UI helpers ────────────────────────────────────────────────
     @JavascriptInterface
-    fun showToast(message: String) {
+    fun showToast(msg: String) {
         android.os.Handler(android.os.Looper.getMainLooper()).post {
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    @JavascriptInterface
-    fun requestOverlayPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
-            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:${context.packageName}"))
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
         }
     }
 

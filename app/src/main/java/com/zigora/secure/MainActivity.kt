@@ -11,6 +11,9 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : AppCompatActivity() {
 
@@ -19,21 +22,12 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Full edge-to-edge immersive
-        window.apply {
-            addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            statusBarColor = Color.TRANSPARENT
-            navigationBarColor = Color.TRANSPARENT
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                setDecorFitsSystemWindows(false)
-            } else {
-                @Suppress("DEPRECATION")
-                decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
-                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                )
-            }
+        // Edge-to-edge setup
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.statusBarColor = Color.TRANSPARENT
+            window.navigationBarColor = Color.TRANSPARENT
         }
 
         setContentView(R.layout.activity_main)
@@ -43,6 +37,21 @@ class MainActivity : AppCompatActivity() {
 
         setupWebView()
         WebAppBridge(this, webView, performanceManager, gameOptimizer)
+
+        // Handle window insets — inject into JS so HTML can pad correctly
+        ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            // Pass insets to WebView JS
+            webView.evaluateJavascript(
+                "window._insets={top:${bars.top},bottom:${bars.bottom},left:${bars.left},right:${bars.right}};" +
+                "var r=document.documentElement.style;" +
+                "r.setProperty('--inset-top','${bars.top}px');" +
+                "r.setProperty('--inset-bottom','${bars.bottom}px');",
+                null
+            )
+            view.setPadding(bars.left, 0, bars.right, 0)
+            insets
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -63,18 +72,24 @@ class MainActivity : AppCompatActivity() {
                 builtInZoomControls = false
                 displayZoomControls = false
                 setSupportZoom(false)
-                mediaPlaybackRequiresUserGesture = false
             }
-            setBackgroundColor(Color.TRANSPARENT)
+            setBackgroundColor(Color.parseColor("#040001"))
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    // Signal APK mode ke JS
-                    view?.evaluateJavascript("window._isApk=true;", null)
+                    view?.evaluateJavascript(
+                        "window._isApk=true;" +
+                        // Fix hero banner path for APK (banner2.jpg not found → use gradient)
+                        "document.querySelectorAll('.hero-img').forEach(function(i){" +
+                        "  i.onerror=function(){this.style.display='none';};" +
+                        "});",
+                        null
+                    )
+                    // Trigger inset update
+                    ViewCompat.requestApplyInsets(webView)
                 }
             }
             webChromeClient = WebChromeClient()
-            // Load dari assets
             loadUrl("file:///android_asset/index.html")
         }
     }
@@ -84,3 +99,4 @@ class MainActivity : AppCompatActivity() {
         else super.onBackPressed()
     }
 }
+

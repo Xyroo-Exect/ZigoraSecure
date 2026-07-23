@@ -82,34 +82,93 @@ body{font-family:'Inter',sans-serif;color:var(--hi);position:relative;}
 #bgCanvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
 
 #splash{
-  position:fixed;inset:0;z-index:999;background:#08050f;overflow:hidden;
-  display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;
-  transition:opacity .6s var(--ease);
+  position:fixed;inset:0;z-index:9999;background:#040001;overflow:hidden;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .6s cubic-bezier(.4,0,.2,1);
 }
 #splash.boot{display:flex;}
 #splash.hide{opacity:0;pointer-events:none;}
-#splashVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
-  opacity:.55;filter:saturate(1.2) brightness(.75);}
-.splash-ov{position:absolute;inset:0;
-  background:radial-gradient(circle at 50% 40%,rgba(185,28,28,0.15) 0%,rgba(8,5,15,.55) 55%,rgba(8,5,15,.96) 100%);}
-.splash-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:20px;}
-.sp-ring{
-  width:70px;height:70px;border-radius:50%;
-  border:2px solid rgba(220,38,38,0.18);border-top:2px solid var(--ac);
-  animation:spin 1.2s linear infinite;
-  position:relative;display:flex;align-items:center;justify-content:center;
+
+/* Grid background */
+.sp-grid{
+  position:absolute;inset:0;
+  background-image:linear-gradient(rgba(220,38,38,0.05) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(220,38,38,0.05) 1px,transparent 1px);
+  background-size:44px 44px;
+  animation:gridMove 10s linear infinite;
 }
-.sp-ring::after{
-  content:'';position:absolute;inset:6px;border-radius:50%;
-  border:2px solid rgba(220,38,38,0.10);border-bottom:2px solid var(--ac3);
-  animation:spin 1.8s linear infinite reverse;
+@keyframes gridMove{from{transform:translateY(0);}to{transform:translateY(44px);}}
+
+/* Center radial glow */
+.sp-glow{
+  position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);
+  width:340px;height:340px;border-radius:50%;
+  background:radial-gradient(circle,rgba(220,38,38,0.15) 0%,transparent 70%);
+  animation:glowBreath 3s ease-in-out infinite;
 }
+@keyframes glowBreath{0%,100%{opacity:.6;transform:translate(-50%,-50%) scale(.95);}50%{opacity:1;transform:translate(-50%,-50%) scale(1.1);}}
+
+/* Logo orbit rings */
+.sp-orbit{position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;}
+.sp-orbit::before{content:'';position:absolute;inset:0;border-radius:50%;border:1px solid rgba(220,38,38,0.10);}
+.sp-orbit::after{content:'';position:absolute;inset:-14px;border-radius:50%;border:1px dashed rgba(220,38,38,0.12);animation:spinR 18s linear infinite reverse;}
+.sp-ring{width:90px;height:90px;border-radius:50%;border:2px solid transparent;
+  border-top:2px solid #dc2626;border-right:2px solid rgba(248,113,113,0.4);
+  animation:spinR 1.1s linear infinite;position:relative;display:flex;align-items:center;justify-content:center;}
+.sp-ring::after{content:'';position:absolute;width:62px;height:62px;border-radius:50%;
+  border:1.5px solid transparent;border-bottom:1.5px solid #f87171;
+  animation:spinR .75s linear infinite reverse;}
+@keyframes spinR{to{transform:rotate(360deg);}}
+.sp-icon{position:absolute;width:38px;height:38px;border-radius:12px;
+  background:linear-gradient(135deg,#7f1d1d,#dc2626);z-index:1;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 24px rgba(220,38,38,0.55);}
+.sp-icon .material-symbols-rounded{font-size:20px;color:#fff;}
+
+/* Text */
+.sp-name{font-family:'Orbitron',monospace;font-size:20px;font-weight:900;
+  color:#fff;letter-spacing:5px;text-shadow:0 0 30px rgba(220,38,38,0.5);
+  animation:nameFlicker 4s ease-in-out infinite;}
+@keyframes nameFlicker{0%,100%{opacity:1;}49%{opacity:1;}50%{opacity:.82;}51%{opacity:1;}}
+.sp-sub{font-family:'Orbitron',monospace;font-size:9px;color:rgba(255,235,235,0.35);letter-spacing:4px;margin-top:4px;}
+
+/* Progress bar */
+.sp-bar{width:220px;height:2px;border-radius:9999px;background:rgba(255,255,255,0.05);overflow:hidden;margin-top:24px;}
+.sp-fill{height:100%;width:0;border-radius:9999px;
+  background:linear-gradient(90deg,#7f1d1d,#dc2626,#f87171);
+  box-shadow:0 0 10px rgba(220,38,38,0.5);transition:width .08s linear;}
+
+/* Status text */
+.sp-status{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:2px;
+  color:rgba(248,113,113,0.6);margin-top:10px;min-height:16px;transition:color .3s;}
+.sp-status.ok{color:#22e58f;}
+.sp-status.err{color:#ff5470;}
+
+/* Error card */
+.sp-err-card{
+  display:none;flex-direction:column;align-items:center;gap:12px;
+  background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.25);
+  border-radius:16px;padding:20px 24px;margin-top:16px;text-align:center;
+}
+.sp-err-card.show{display:flex;}
+.sp-err-icon{font-size:36px;color:#ff5470;}
+.sp-err-title{font-family:'Orbitron',monospace;font-size:13px;font-weight:900;color:#fff;}
+.sp-err-msg{font-size:11px;color:rgba(255,235,235,0.5);line-height:1.6;}
+.sp-retry-btn{
+  margin-top:4px;padding:10px 24px;border-radius:10px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,#7f1d1d,#dc2626);color:#fff;
+  font-family:'Orbitron',monospace;font-size:10px;font-weight:700;letter-spacing:1.5px;
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* Dots */
+.sp-dots{display:flex;gap:8px;margin-top:8px;}
+.sp-dot{width:5px;height:5px;border-radius:50%;background:rgba(220,38,38,0.25);}
+.sp-dot:nth-child(1){animation:dotP 1.4s .0s ease-in-out infinite;}
+.sp-dot:nth-child(2){animation:dotP 1.4s .2s ease-in-out infinite;}
+.sp-dot:nth-child(3){animation:dotP 1.4s .4s ease-in-out infinite;}
+@keyframes dotP{0%,100%{background:rgba(220,38,38,0.25);transform:scale(1);}50%{background:#dc2626;transform:scale(1.5);}}
 @keyframes spin{to{transform:rotate(360deg)}}
-.sp-name{font-family:'Orbitron',monospace;font-size:18px;font-weight:900;
-  color:var(--ac);letter-spacing:3px;text-shadow:0 0 20px var(--glow);}
-.sp-sub{font-size:10px;color:var(--lo);letter-spacing:4px;}
-.sp-bar{width:160px;height:1px;background:rgba(255,255,255,0.06);border-radius:9999px;overflow:hidden;}
-.sp-fill{height:100%;width:0;background:linear-gradient(90deg,var(--ac2),var(--ac),var(--ac3));box-shadow:0 0 8px var(--ac);}
 
 .disp-preview{
   width:100%;border-radius:var(--r);border:1px solid var(--bdr);
@@ -624,10 +683,10 @@ body{font-family:'Inter',sans-serif;color:var(--hi);position:relative;}
   flex-shrink:0;
   padding:calc(12px + var(--inset-top)) 16px 10px;
   display:flex;align-items:center;justify-content:space-between;
-  background:linear-gradient(180deg,rgba(8,14,28,0.92),rgba(4,6,15,0.78));
+  background:linear-gradient(180deg,rgba(4,0,0,0.97),rgba(8,0,1,0.85));
   backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%);
   border-bottom:1px solid var(--bdr);
-  box-shadow:0 4px 24px -8px rgba(220,38,38,0.10);position:relative;z-index:5;
+  box-shadow:0 4px 24px -8px rgba(220,38,38,0.15);position:relative;z-index:5;
 }
 .hdr-left{display:flex;align-items:center;gap:10px;}
 .hdr-icon{
@@ -1155,15 +1214,26 @@ body{font-family:'Inter',sans-serif;color:var(--hi);position:relative;}
 </div>
 
 <div id="splash">
-  <video id="splashVideo" autoplay muted loop playsinline onerror="this.style.display='none'">
-    <source src="intro.mp4" type="video/mp4">
-  </video>
-  <div class="splash-ov"></div>
-  <div class="splash-content">
-    <div class="sp-ring"></div>
-    <div class="sp-name">ZIGORA-SECURE</div>
-    <div class="sp-sub">LOADING SYSTEM</div>
-    <div class="sp-bar"><div class="sp-fill" id="spFill"></div></div>
+  <div class="sp-grid"></div>
+  <div class="sp-glow"></div>
+  <div class="sp-orbit">
+    <div class="sp-ring">
+      <div class="sp-icon"><span class="material-symbols-rounded">security</span></div>
+    </div>
+  </div>
+  <div class="sp-name">ZIGORA</div>
+  <div class="sp-sub">SECURE · by @Xyroo</div>
+  <div class="sp-bar"><div class="sp-fill" id="spFill"></div></div>
+  <div class="sp-status" id="spStatus">INITIALIZING...</div>
+  <div class="sp-dots">
+    <div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div>
+  </div>
+  <!-- Error card (shown if root/shizuku not found) -->
+  <div class="sp-err-card" id="spErrCard">
+    <span class="material-symbols-rounded sp-err-icon">gpp_bad</span>
+    <div class="sp-err-title">AKSES DITOLAK</div>
+    <div class="sp-err-msg" id="spErrMsg">Root / Shizuku tidak terdeteksi.<br>Zigora Secure membutuhkan akses root.</div>
+    <button class="sp-retry-btn" onclick="splashCheckRoot()">COBA LAGI</button>
   </div>
 </div>
 
@@ -2412,9 +2482,9 @@ body{font-family:'Inter',sans-serif;color:var(--hi);position:relative;}
       <span class="material-symbols-rounded ni">network_node</span>
       <span class="nl">NETWORK</span>
     </button>
-    <button class="nav-btn" id="nb-dns" onclick="goPage('dns')">
-      <span class="material-symbols-rounded ni">dns</span>
-      <span class="nl">DNS</span>
+    <button class="nav-btn" id="nb-engine" onclick="goPage('engine')">
+      <span class="material-symbols-rounded ni">smart_toy</span>
+      <span class="nl">ENGINE</span>
     </button>
     <button class="nav-btn" id="nb-extras" onclick="goPage('extras')">
       <span class="material-symbols-rounded ni">build</span>
@@ -2522,8 +2592,6 @@ function goPage(id){
   curPage=id;
   navPushState(id);
   updateNavIndicator();
-  if(id==='dns')refreshDnsStatus();
-  if(id==='display')readDeviceDisplay();
   if(id==='netinject')niPageOpen();
   if(id==='touch')touchPageOpen();
   if(id==='engine')refreshEngineMonitor();
@@ -2666,6 +2734,26 @@ async function tick(){
 }
 
 async function devInfo(){
+  // Mode APK — gunakan Android API langsung
+  if (window._isApk && typeof ZigoraSecure !== 'undefined' && ZigoraSecure.getSystemInfo) {
+    try {
+      const info = JSON.parse(ZigoraSecure.getSystemInfo());
+      $s('iModel', clip(info.device_model||'—',22));
+      $s('iChip',  clip(info.chipset||info.cpu_governor||'—',16));
+      $s('iKernel',clip((info.kernel||'—').split('-')[0],18));
+      $s('iAndroid',clip(info.android_version||'—',6));
+      $s('iSdk',   clip(String(info.sdk_version||'—'),4));
+      $s('iRam',   info.total_ram_gb ? info.total_ram_gb+' GB' : '—');
+      if (navigator.getBattery) {
+        navigator.getBattery().then(function(b){
+          $s('iBat', Math.round(b.level*100)+'%');
+          $s('iTemp', b.charging ? 'Charging' : '—');
+        }).catch(function(){});
+      }
+      return;
+    } catch(_) {}
+  }
+  // Mode Modul — shell
   const[model,chip,kern,and,sdk,mem]=await Promise.all([
     sh('getprop ro.product.model'),sh('getprop ro.board.platform'),
     sh('uname -r'),sh('getprop ro.build.version.release'),
@@ -3015,9 +3103,10 @@ let glScaleVal=1.0, glFrameVal=60, glDriverVal='game';
 let cachedGameList=[];
 let gameIconCache={};
 
-// ── Icon loader: extract ke webroot/icons/ ─────────────────────
-// Tidak pakai base64 (buffer limit AxManager), load via relative URL
-const ICONS_DIR = '/data/adb/modules/ZIGORA_SECURE/webroot/icons';
+// ── Icon loader: APK=base64, Module=relative URL ──────────────
+const ICONS_DIR = window._isApk
+  ? '/data/local/tmp/zg_icons'
+  : '/data/adb/modules/ZIGORA_SECURE/webroot/icons';
 
 async function _mkIconsDir() {
   try { await sh('mkdir -p "' + ICONS_DIR + '" 2>/dev/null'); } catch(_){}
@@ -3027,52 +3116,30 @@ async function getInstalledGameIcon(pkg) {
   if (!pkg || pkg === 'No active games') return null;
   if (pkg in gameIconCache) return gameIconCache[pkg];
   gameIconCache[pkg] = null;
-
   const fsPath = ICONS_DIR + '/' + pkg + '.png';
-  const webUrl = 'icons/' + pkg + '.png?v=' + Date.now();
-
+  const useB64 = !!window._isApk;
   try {
-    // Cek cache di disk dulu
     const cached = (await sh('[ -s "' + fsPath + '" ] && echo 1 || echo 0')).trim();
-    if (cached === '1') { gameIconCache[pkg] = webUrl; return webUrl; }
-
-    // Get APK path
-    const apk = (await sh('pm path ' + pkg + ' 2>/dev/null | grep -m1 package: | sed "s/package://" | tr -d " \\r\\n"')).trim();
-    if (!apk || apk.length < 5) return null;
-
-    await _mkIconsDir();
-
-    // Coba extract icon dengan path yang paling umum (tanpa parsing unzip -l)
-    const tryPaths = [
-      'res/mipmap-xxxhdpi-v4/ic_launcher.png',
-      'res/mipmap-xxhdpi-v4/ic_launcher.png',
-      'res/mipmap-xhdpi-v4/ic_launcher.png',
-      'res/mipmap-xxxhdpi/ic_launcher.png',
-      'res/mipmap-xxhdpi/ic_launcher.png',
-      'res/mipmap-xhdpi/ic_launcher.png',
-      'res/mipmap-hdpi/ic_launcher.png',
-      'res/mipmap-xxxhdpi-v4/ic_launcher.webp',
-      'res/mipmap-xxhdpi-v4/ic_launcher.webp',
-      'res/mipmap-xxxhdpi/ic_launcher.webp',
-      'res/mipmap-xxhdpi/ic_launcher.webp',
-    ];
-    for (const p of tryPaths) {
-      const r = (await sh(
-        'unzip -p "' + apk + '" "' + p + '" > "' + fsPath + '" 2>/dev/null' +
-        ' && [ -s "' + fsPath + '" ] && echo ok || { rm -f "' + fsPath + '"; echo fail; }'
-      )).trim();
-      if (r === 'ok') { gameIconCache[pkg] = webUrl; return webUrl; }
+    if (cached === '1') {
+      if (!useB64) { gameIconCache[pkg] = 'icons/' + pkg + '.png?v=' + Date.now(); return gameIconCache[pkg]; }
+      const b64 = (await sh('base64 "' + fsPath + '" 2>/dev/null | tr -d "\n"')).trim();
+      if (b64 && b64.length > 100) { gameIconCache[pkg] = 'data:image/png;base64,' + b64; return gameIconCache[pkg]; }
     }
-
-    // Fallback: cari nama icon dari unzip -l, ambil baris terakhir yang match
-    const found = (await sh(
-      'unzip -l "' + apk + '" 2>/dev/null | grep -oE "[^ ]+$"' +
-      ' | grep -iE "ic_launcher\\.(png|webp)$" | grep -iv "round|night" | tail -1'
-    )).trim();
-    if (found) {
-      await sh('unzip -p "' + apk + '" "' + found + '" > "' + fsPath + '" 2>/dev/null');
-      const sz = parseInt((await sh('wc -c < "' + fsPath + '" 2>/dev/null')).trim()) || 0;
-      if (sz > 200) { gameIconCache[pkg] = webUrl; return webUrl; }
+    const apk = (await sh('pm path ' + pkg + ' 2>/dev/null | grep -m1 package: | sed "s/package://" | tr -d " \r\n"')).trim();
+    if (!apk || apk.length < 5) return null;
+    await _mkIconsDir();
+    const tryPaths = ['res/mipmap-xxxhdpi-v4/ic_launcher.png','res/mipmap-xxhdpi-v4/ic_launcher.png',
+      'res/mipmap-xhdpi-v4/ic_launcher.png','res/mipmap-xxxhdpi/ic_launcher.png',
+      'res/mipmap-xxhdpi/ic_launcher.png','res/mipmap-xhdpi/ic_launcher.png',
+      'res/mipmap-hdpi/ic_launcher.png','res/mipmap-xxxhdpi-v4/ic_launcher.webp',
+      'res/mipmap-xxhdpi-v4/ic_launcher.webp','res/mipmap-xxxhdpi/ic_launcher.webp'];
+    for (const p of tryPaths) {
+      const r = (await sh('unzip -p "' + apk + '" "' + p + '" > "' + fsPath + '" 2>/dev/null && [ -s "' + fsPath + '" ] && echo ok || { rm -f "' + fsPath + '"; echo fail; }')).trim();
+      if (r === 'ok') {
+        if (!useB64) { gameIconCache[pkg] = 'icons/' + pkg + '.png?v=' + Date.now(); return gameIconCache[pkg]; }
+        const b64 = (await sh('base64 "' + fsPath + '" 2>/dev/null | tr -d "\n"')).trim();
+        if (b64 && b64.length > 100) { gameIconCache[pkg] = 'data:image/png;base64,' + b64; return gameIconCache[pkg]; }
+      }
     }
   } catch(_) {}
   gameIconCache[pkg] = null;
@@ -3083,6 +3150,18 @@ async function getInstalledGameIcon(pkg) {
 const GAME_GREP = 'legend|pubg|freefire|freefir|garena|codm|activision|supercell|roblox|mojang|mihayo|mihoyo|netease|gameloft|moonton|brawl|clash|royale|shooter|battle|moba|arena|genshin|honkai|fortnite|asphalt|wildrift|tmgp|sgame|dts.free|vng|bandai|nexon|ubisoft|capcom|gungho|nfs3|racing|fighter|tap4fun|rovio|lifeafter|pointblank|freefiresea';
 
 async function scanInstalledGames() {
+  // Mode APK — gunakan getInstalledPackages() langsung (lebih cepat, tidak perlu root)
+  if (window._isApk && typeof ZigoraSecure !== 'undefined' && ZigoraSecure.getInstalledPackages) {
+    try {
+      const all = ZigoraSecure.getInstalledPackages();
+      if (all && all.trim()) {
+        const re = new RegExp(GAME_GREP, 'i');
+        const list = all.trim().split('\n').filter(function(p){ return p && re.test(p); });
+        if (list.length > 0) { cachedGameList = list; return list; }
+      }
+    } catch(_) {}
+  }
+  // Mode Modul — shell
   try {
     const raw = await sh(
       "pm list packages 2>/dev/null | sed 's/package://' | grep -iE '" + GAME_GREP + "' | sort | uniq"
@@ -3090,8 +3169,7 @@ async function scanInstalledGames() {
     if (raw && raw.trim()) {
       const list = raw.trim().split('\n').filter(Boolean);
       if (list.length > 0) {
-        // Simpan ke cache file (fire-and-forget)
-        sh('cat > ' + INSTALLED_FILTERED + ' << __EOF__\n' + list.join('\n') + '\n__EOF__').catch(function(){});
+        sh('printf "%s\n" ' + list.map(function(p){return '"'+p+'"';}).join(' ') + ' > ' + INSTALLED_FILTERED + ' 2>/dev/null').catch(function(){});
         return list;
       }
     }
@@ -3223,29 +3301,24 @@ async function glOpenGame() {
   }
   showToast('🎮 Meluncurkan ' + glCurrentPkg.split('.').pop() + '...', 'info', 'Game Library');
   try {
-    // Resolve actual launcher activity via cmd package (avoid monkey which causes auto-stop)
+    // Mode APK — gunakan launchApp() langsung
+    if (window._isApk && typeof ZigoraSecure !== 'undefined' && ZigoraSecure.launchApp) {
+      const ok = ZigoraSecure.launchApp(glCurrentPkg);
+      if (!ok) showToast('❌ Gagal meluncurkan game', 'error', 'Game Library');
+      return;
+    }
+    // Mode Modul — shell am start
     const resolved = await sh(
-      `cmd package resolve-activity --brief -c android.intent.category.LAUNCHER -a android.intent.action.MAIN ${glCurrentPkg} 2>/dev/null | tail -1`
+      'cmd package resolve-activity --brief -c android.intent.category.LAUNCHER -a android.intent.action.MAIN ' + glCurrentPkg + ' 2>/dev/null | tail -1'
     );
     const activityLine = (resolved || '').trim();
     let launched = false;
-
     if (activityLine && activityLine.includes('/')) {
-      // Launch with resolved activity — most reliable, no auto-stop
-      const out = await sh(`am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "${activityLine}" 2>&1`);
+      const out = await sh('am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "' + activityLine + '" 2>&1');
       if (!out.toLowerCase().includes('error') && !out.toLowerCase().includes('exception')) launched = true;
     }
-
     if (!launched) {
-      // Fallback: launcher intent with package only (Android resolves activity internally)
-      const out2 = await sh(`am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p ${glCurrentPkg} 2>&1`);
-      if (!out2.toLowerCase().includes('unable') && !out2.toLowerCase().includes('exception')) launched = true;
-    }
-
-    if (!launched) {
-      // Last fallback: pm resolve-activity + am start
-      const pm = await sh(`pm resolve-activity --brief -c android.intent.category.LAUNCHER ${glCurrentPkg} 2>/dev/null | tail -1`);
-      if (pm && pm.trim()) await sh(`am start -n "${pm.trim()}" 2>/dev/null`);
+      await sh('am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p ' + glCurrentPkg + ' 2>&1');
     }
 
     showToast('✅ Game berhasil diluncurkan!', 'success', 'Game Library');
@@ -3914,21 +3987,82 @@ function showToast(msg,type,title){
 // ════════════════════════════════════════════════════════════
 //  SPLASH
 // ════════════════════════════════════════════════════════════
-function splash(){
-  const fill=document.getElementById('spFill'),start=Date.now();let prog=0;
-  function f(){
-    const t=Math.min((Date.now()-start)/3500,1);
-    prog+=(((1-Math.pow(1-t,3))*100)-prog)*.12;
-    fill.style.width=prog.toFixed(1)+'%';
-    if(t<1)requestAnimationFrame(f);
-    else{
-      const sp=document.getElementById('splash'),wr=document.getElementById('wrap');
-      setTimeout(()=>sp.classList.add('hide'),200);
-      setTimeout(()=>wr.classList.add('show'),320);
-      setTimeout(()=>sp.remove(),900);
+// ════════════════════════════════════════════════════════════
+//  SPLASH + ROOT/SHIZUKU VERIFICATION
+// ════════════════════════════════════════════════════════════
+function _spSetStatus(msg, type) {
+  const el = document.getElementById('spStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'sp-status' + (type ? ' ' + type : '');
+}
+function _spProgress(pct) {
+  const el = document.getElementById('spFill');
+  if (el) el.style.width = pct + '%';
+}
+
+async function splashCheckRoot() {
+  const errCard = document.getElementById('spErrCard');
+  if (errCard) errCard.classList.remove('show');
+  _spProgress(0);
+  _spSetStatus('CHECKING ROOT ACCESS...');
+
+  // Step 1 — 0→40%
+  await new Promise(r => setTimeout(r, 400));
+  _spProgress(40);
+
+  // Step 2 — verifikasi root
+  let rooted = false;
+  try {
+    if (typeof ZigoraSecure !== 'undefined' && ZigoraSecure.isRooted) {
+      rooted = ZigoraSecure.isRooted();
+    } else {
+      const r = await sh('id 2>/dev/null');
+      rooted = r.includes('uid=0') || r.includes('root');
     }
+  } catch(_) {}
+
+  _spProgress(65);
+  _spSetStatus('VERIFYING PERMISSIONS...');
+  await new Promise(r => setTimeout(r, 300));
+
+  if (!rooted) {
+    _spProgress(65);
+    _spSetStatus('ROOT NOT FOUND', 'err');
+    if (errCard) {
+      document.getElementById('spErrMsg').textContent =
+        'Root / Shizuku tidak terdeteksi.\nZigora Secure membutuhkan akses root (Magisk/KSU).';
+      errCard.classList.add('show');
+    }
+    return; // Berhenti di sini
   }
-  requestAnimationFrame(f);
+
+  // Root OK — lanjut
+  _spSetStatus('ROOT VERIFIED', 'ok');
+  _spProgress(80);
+  await new Promise(r => setTimeout(r, 250));
+
+  _spSetStatus('LOADING ENGINE...', 'ok');
+  _spProgress(95);
+  await new Promise(r => setTimeout(r, 300));
+
+  _spProgress(100);
+  _spSetStatus('READY', 'ok');
+  await new Promise(r => setTimeout(r, 200));
+
+  // Dismiss splash
+  const sp = document.getElementById('splash');
+  const wr = document.getElementById('wrap');
+  if (sp) sp.classList.add('hide');
+  if (wr) wr.classList.add('show');
+  setTimeout(() => { if (sp) sp.remove(); }, 700);
+}
+
+function splash() {
+  // Animasikan dan jalankan root check
+  _spProgress(0);
+  setTimeout(() => { _spProgress(20); }, 100);
+  setTimeout(() => splashCheckRoot(), 500);
 }
 
 // ════════════════════════════════════════════════════════════
